@@ -1,29 +1,10 @@
-![Image](./header.png)
+# Scaling Ethereum 2024
 
-# Stylus Hello World
+This is my submission for [Scaling Ethereum 2024](https://ethglobal.com/events/scaling2024).
 
-Project starter template for writing Arbitrum Stylus programs in Rust using the [stylus-sdk](https://github.com/OffchainLabs/stylus-sdk-rs). It includes a Rust implementation of a basic counter Ethereum smart contract:
+The repository was bootstrapped from the [stylus-hello-world](https://github.com/OffchainLabs/stylus-hello-world/tree/45a9fbdca70924d9ae39e49ec2661dc6eb5ac610) project.
 
-```js
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
-
-contract Counter {
-    uint256 public number;
-
-    function setNumber(uint256 newNumber) public {
-        number = newNumber;
-    }
-
-    function increment() public {
-        number++;
-    }
-}
-```
-
-To set up more minimal example that still uses the Stylus SDK, use `cargo stylus new --minimal <YOUR_PROJECT_NAME>` under [OffchainLabs/cargo-stylus](https://github.com/OffchainLabs/cargo-stylus).
-
-## Quick Start 
+## Setup
 
 Install [Rust](https://www.rust-lang.org/tools/install), and then install the Stylus CLI tool with Cargo
 
@@ -41,12 +22,6 @@ You should now have it available as a Cargo subcommand:
 
 ```bash
 cargo stylus --help
-```
-
-Then, clone the template:
-
-```
-git clone https://github.com/OffchainLabs/stylus-hello-world && cd stylus-hello-world
 ```
 
 ### Testnet Information
@@ -202,4 +177,4 @@ Where you can find `YOUR_ARCHITECTURE` by running `rustc -vV | grep host`. For M
 
 ## License
 
-This project is fully open source, including an Apache-2.0 or MIT license at your choosing under your own copyright.
+This project is fully open source, under the Apache-2.0 license.

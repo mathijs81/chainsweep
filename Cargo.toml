@@ -1,12 +1,12 @@
 [package]
-name = "stylus-hello-world"
-version = "0.1.5"
+name = "scaling-ethereum"
+version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
-homepage = "https://github.com/OffchainLabs/stylus-hello-world"
-repository = "https://github.com/OffchainLabs/stylus-hello-world"
-keywords = ["arbitrum", "ethereum", "stylus", "alloy"]
-description = "Stylus hello world example"
+license = "Apache-2.0"
+homepage = "https://github.com/mathijs81/scaling-ethereum-2024"
+repository = "https://github.com/mathijs81/scaling-ethereum-2024"
+keywords = ["arbitrum", "ethereum", "stylus", "scaling", "hackathon"]
+description = "Submission for Scaling Ethereum 2024 hackathon"
 
 [dependencies]
 alloy-primitives = "0.3.1"

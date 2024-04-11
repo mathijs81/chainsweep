@@ -12,8 +12,7 @@ description = "Submission for Scaling Ethereum 2024 hackathon"
 alloy-primitives = "0.3.1"
 alloy-sol-types = "0.3.1"
 stylus-sdk = "0.4.3"
-hex = "0.4.3"
-rustmate = "0.1.0"
+mini-alloc = "0.4.2"
 
 [features]
 export-abi = ["stylus-sdk/export-abi"]
@@ -28,7 +27,6 @@ strip = true
 lto = true
 panic = "abort"
 opt-level = "z"
-debug = false
-rpath = false
+debug = 0
 debug-assertions = false
 incremental = false

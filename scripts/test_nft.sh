@@ -29,6 +29,9 @@ fi
 
 cd nft
 
+crate_src_abspath=`cargo metadata --no-deps --format-version 1 | jq -r '.workspace_root'`
+export RUSTFLAGS="--remap-path-prefix src=$crate_src_abspath/src"
+
 # ----------------- #
 # Deployment of our NFT contract #
 # ----------------- #

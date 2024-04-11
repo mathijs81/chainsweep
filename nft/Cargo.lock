@@ -339,6 +339,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 
 [[package]]
+name = "mini-alloc"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd9993556d3850cdbd0da06a3dc81297edcfa050048952d84d75e8b944e8f5af"
+dependencies = [
+ "cfg-if 1.0.0",
+ "wee_alloc",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -509,18 +519,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustmate"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ee4043293ebb07798afd44694c0ae244c8f65ea55aab58bcdd9812428836590"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "stylus-sdk",
- "wee_alloc",
-]
-
-[[package]]
 name = "rusty-fork"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -538,8 +536,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
- "hex",
- "rustmate",
+ "mini-alloc",
  "stylus-sdk",
 ]
 

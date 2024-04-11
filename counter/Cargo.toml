@@ -25,8 +25,12 @@ export-abi = ["stylus-sdk/export-abi"]
 debug = ["stylus-sdk/debug"]
 
 [[bin]]
-name = "stylus-hello-world"
-path = "src/main.rs"
+name = "counter"
+path = "src_counter/main.rs"
+
+[[bin]]
+name = "nft"
+path = "src_nft/main.rs"
 
 [lib]
 crate-type = ["lib", "cdylib"]

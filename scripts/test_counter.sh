@@ -6,6 +6,8 @@
 # Configuration #
 # ------------- #
 
+set -euo pipefail
+
 # Load variables from .env file
 set -o allexport
 source scripts/.env
@@ -24,6 +26,8 @@ then
     echo "You need to provide the PRIVATE_KEY and the ADDRESS of the deployer"
     exit 0
 fi
+
+cd counter
 
 # ----------------- #
 # Deployment of our counter contract #

@@ -1,2 +1,4 @@
 debug/
 target/
+.env
+*_tx_data

@@ -1,10 +1,10 @@
-# Scaling Ethereum 2024
+# ChainSweep game
 
-This is my submission for [Scaling Ethereum 2024](https://ethglobal.com/events/scaling2024).
+This is an arbitrum Stylus-based blockchain game called ChainSweep.
 
-# What is it?
+In a field of blocks, find the faulty ones (not unlike the good ol' minesweeper).
 
-In progress -- current ly just trying things out.
+This is a submission for [Scaling Ethereum 2024](https://ethglobal.com/events/scaling2024).
 
 ## Setup
 

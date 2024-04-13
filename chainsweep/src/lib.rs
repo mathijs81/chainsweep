@@ -5,6 +5,7 @@ extern crate alloc;
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
+use alloy_primitives::Address;
 /// Import items from the SDK. The prelude contains common traits and macros.
 use stylus_sdk::{block, evm, msg, prelude::*};
 use sweeper::{GameAlreadyStarted, GameError, GameStarted};
@@ -41,5 +42,14 @@ impl SweeperGame {
     pub fn view(&self) -> String {
         let caller = msg::sender();
         self.games.get(caller).print()
+    }
+    pub fn view_for(&self, address: Address) -> String {
+        self.games.get(address).print()
+    }
+
+    pub fn make_guess(&mut self, x: u8, y: u8) -> Result<u8, GameError> {
+        let caller = msg::sender();
+        let mut game = self.games.setter(caller);
+        game.make_guess(x, y)
     }
 }

@@ -61,6 +61,14 @@ fn next_rand(seed: u64) -> u64 {
     x
 }
 
+/*
+TODO:
+  winning condition
+  auto-open empty fields
+  randomize possible field on every guess
+  make sure first guess is not a bug
+  store sequence of moves
+*/
 impl Game {
     fn set_field(&mut self, x: u8, y: u8, value: u8) {
         let field = (x + y * WIDTH) as usize;

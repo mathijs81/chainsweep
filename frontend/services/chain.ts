@@ -1,6 +1,12 @@
 
 import { mainnet, arbitrum } from 'viem/chains'
-import { createWalletClient, custom, defineChain, type Client, type WalletClient } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, http, type Client, type WalletClient } from 'viem';
+
+import { getContract} from 'viem';
+import sweeperAbi from '@/data/abi.json';
+
+const contractAddress = '0xCA8c8688914e0F7096c920146cd0Ad85cD7Ae8b9';
+
 
 export const targetChain = defineChain({
 	id: 412346,
@@ -53,28 +59,69 @@ export class Game {
 }
 
 class Web3Service {
+    private publicClient: Client = createPublicClient({
+        chain: targetChain,
+        transport: http()
+    });
     private client: WalletClient | null = null;
     private address: Ref<string | null> = ref(null);
     private currentGame: Ref<Game | null> = ref(null);
+
+    private contract() {
+        console.log(sweeperAbi);
+        const contract = getContract({
+            address: contractAddress,
+            abi: sweeperAbi,
+            client: {
+                public: this.publicClient,
+                wallet: this.client!!
+            }
+        });
+        return contract;
+    }
 
     getCurrentGame() {
         return readonly(this.currentGame);
     }
 
     async onConnect() {
-        if (window.ethereum == null) {
-            this.client = null;
-            this.address.value = null;
-        } else {
-            console.log('creating client');
+        this.client = null;
+        this.address.value = null;
+        if (window.ethereum != null) {
             this.client = createWalletClient({
                 chain: targetChain,
                 transport: custom(window.ethereum)
-            })
-            const addresses = await this.client?.getAddresses();
-            this.address.value = addresses?.[0] ?? null;
-            
+            });
+            if (this.client.chain?.id !== targetChain.id) {
+                this.client.switchChain(targetChain);
+            } else {
+                const addresses = await this.client?.getAddresses();
+                this.address.value = addresses?.[0] ?? null;
+                if (this.address.value) {
+                    const result = await this.contract().read.viewFor([this.address.value]);
+                    this.onGameUpdate(result);
+                }
+            }
         }   
+    }
+
+    private onGameUpdate(result: string) { 
+        if (result.includes('not started')) {
+            this.currentGame.value = null;
+        }
+        const lines = result.trim().split('\n');
+        const game = new Game();
+        game.state = GameState.PLAYING;
+        const lastLine = lines[lines.length - 1];
+        if (lastLine.includes('Won')) {
+            game.state = GameState.WON;
+        } else if (lastLine.includes('Lost')) {
+            game.state = GameState.LOST;
+        }
+        for (let i = 0; i < lines.length - 1; i++) {
+            game.field.push(lines[i]);
+        }
+        this.currentGame.value = game;
     }
 }
 

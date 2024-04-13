@@ -1,9 +1,9 @@
 
 import { mainnet, arbitrum } from 'viem/chains'
-import { createPublicClient, createWalletClient, custom, defineChain, http, type Client, type WalletClient } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Client, type WalletClient } from 'viem';
 
 import { getContract} from 'viem';
-import sweeperAbi from '@/data/abi.json';
+import { chainsweepAbi } from '../src/generated';
 
 const contractAddress = '0xCA8c8688914e0F7096c920146cd0Ad85cD7Ae8b9';
 
@@ -64,14 +64,13 @@ class Web3Service {
         transport: http()
     });
     private client: WalletClient | null = null;
-    private address: Ref<string | null> = ref(null);
+    private address: Ref<Address | null> = ref(null);
     private currentGame: Ref<Game | null> = ref(null);
 
     private contract() {
-        console.log(sweeperAbi);
         const contract = getContract({
             address: contractAddress,
-            abi: sweeperAbi,
+            abi: chainsweepAbi,
             client: {
                 public: this.publicClient,
                 wallet: this.client!!

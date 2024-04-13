@@ -21,12 +21,16 @@ if (process.client) { // only when using Nuxt 3
 
 function handleConnect(wallet: ConnWallet) {
 	console.log('handleConnect', wallet)
-	web3Service.onConnect();
+	web3Service.onConnect(wallet.chainId);
 }
 
 function handleDisconnect() {
 	console.log('handleDisconnect')
 }
+
+useVueDapp().onAccountOrChainIdChanged((wallet: ConnWallet) => {
+	web3Service.onConnect(wallet.chainId);
+});
 </script>
 
 <template>

@@ -2,41 +2,41 @@
 import { mainnet, arbitrum } from 'viem/chains'
 import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Client, type WalletClient } from 'viem';
 
-import { getContract} from 'viem';
+import { getContract } from 'viem';
 import { chainsweepAbi } from '../src/generated';
 
-const contractAddress = '0xCA8c8688914e0F7096c920146cd0Ad85cD7Ae8b9';
+const contractAddress = '0x4bf010f1b9beDA5450a8dD702ED602A104ff65EE';
 
 
 export const targetChain = defineChain({
-	id: 412346,
-	name: "Stylus Devnet",
-	network: "Arbitrum Stylus",
-	nativeCurrency: {
-		decimals: 18,
-		name: "Ether",
-		symbol: "ETH",
-	},
-	rpcUrls: {
-		default: {
-			http: ["http://localhost:8547"],
-			webSocket: [
-				"wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
-			],
-		},
-		public: {
-			http: ["http://localhost:8547"],
-			webSocket: [
-				"wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
-			],
-		},
-	},
-	blockExplorers: {
-		default: {
-			name: "Explorer",
-			url: "https://stylus-testnet-explorer.arbitrum.io/",
-		},
-	},
+    id: 412346,
+    name: "Stylus Devnet",
+    network: "Arbitrum Stylus",
+    nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH",
+    },
+    rpcUrls: {
+        default: {
+            http: ["http://localhost:8547"],
+            webSocket: [
+                "wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
+            ],
+        },
+        public: {
+            http: ["http://localhost:8547"],
+            webSocket: [
+                "wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
+            ],
+        },
+    },
+    blockExplorers: {
+        default: {
+            name: "Explorer",
+            url: "https://stylus-testnet-explorer.arbitrum.io/",
+        },
+    },
 });
 
 export enum GameState {
@@ -83,28 +83,35 @@ class Web3Service {
         return readonly(this.currentGame);
     }
 
-    async onConnect() {
+    async onConnect(chainId: number) {
         this.client = null;
         this.address.value = null;
         if (window.ethereum != null) {
+            // window.ethereum.enable();
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const account = accounts[0] as Address;
+            console.log('got account', account);
             this.client = createWalletClient({
                 chain: targetChain,
-                transport: custom(window.ethereum)
+                transport: custom(window.ethereum),
+                account,
             });
-            if (this.client.chain?.id !== targetChain.id) {
+            if (chainId !== targetChain.id) {
                 this.client.switchChain(targetChain);
             } else {
                 const addresses = await this.client?.getAddresses();
                 this.address.value = addresses?.[0] ?? null;
+                console.log('got addresses', addresses);
                 if (this.address.value) {
                     const result = await this.contract().read.viewFor([this.address.value]);
+                    console.log('viewFor result:', result);
                     this.onGameUpdate(result);
                 }
             }
-        }   
+        }
     }
 
-    private onGameUpdate(result: string) { 
+    private onGameUpdate(result: string) {
         if (result.includes('not started')) {
             this.currentGame.value = null;
         }
@@ -121,6 +128,12 @@ class Web3Service {
             game.field.push(lines[i]);
         }
         this.currentGame.value = game;
+    }
+
+    clickCell(x: number, y: number) {
+        this.contract().write.makeGuess([x, y]).then(result => {
+            console.log('Click on cell', x, y, 'result:', result);
+        });
     }
 }
 

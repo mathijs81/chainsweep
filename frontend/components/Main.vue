@@ -11,7 +11,8 @@ const currentBoard = computed(() => {
 });
 
 function click(data: { x: number, y: number }) {
-    console.log(`Clicked at ${data.x}, ${data.y}`);
+    //console.log(`Clicked at ${data.x}, ${data.y}`);
+    web3Service.clickCell(data.x, data.y);
 }
 </script>
 

@@ -116,7 +116,6 @@ impl Game {
             return "Game not started".to_string();
         }
         let mut res = String::new();
-        res.push_str("----\n");
         for i in 0..WIDTH {
             for j in 0..HEIGHT {
                 let fieldval = self.get_field(i, j);
@@ -129,6 +128,12 @@ impl Game {
                 }
             }
             res.push_str("\n");
+        }
+        match self.state.get().byte(0) {
+            STATE_PLAYING => res.push_str("Playing\n"),
+            STATE_LOST => res.push_str("Lost\n"),
+            STATE_WON => res.push_str("Won\n"),
+            _ => res.push_str("Unknown state")
         }
         res
     }

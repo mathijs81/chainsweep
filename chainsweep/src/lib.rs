@@ -39,12 +39,8 @@ impl SweeperGame {
         Ok(game.print())
     }
 
-    pub fn view(&self) -> String {
-        let caller = msg::sender();
-        self.games.get(caller).print()
-    }
-    pub fn view_for(&self, address: Address) -> String {
-        self.games.get(address).print()
+    pub fn view_for(&self, address: Address) -> Result<String, GameError> {
+        Ok(self.games.get(address).print())
     }
 
     pub fn make_guess(&mut self, x: u8, y: u8) -> Result<u8, GameError> {

@@ -26,6 +26,13 @@ You should now have it available as a Cargo subcommand:
 cargo stylus --help
 ```
 
+Install solc (necessary to generate json ABI):
+
+```bash
+wget https://github.com/ethereum/solidity/releases/download/v0.8.25/solc-static-linux -O ~/.local/bin/solc
+chmod a+x ~/.local/bin/solc
+```
+
 ### Testnet Information
 
 All testnet information, including faucets and RPC endpoints can be found [here](https://docs.arbitrum.io/stylus/reference/testnet-information).

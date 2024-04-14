@@ -11,7 +11,7 @@ use stylus_sdk::{
 const WIDTH: u8 = 11;
 const HEIGHT: u8 = 11;
 
-const BUG_CHANCE_100: u8 = 35;
+const BUG_CHANCE_100: u8 = 20;
 
 sol! {
     event GameStarted(address indexed player);
@@ -57,6 +57,7 @@ pub struct Game {
 
 const BUG: u8 = 9;
 const UNOPENED: u8 = 10;
+const HIDDEN_BUG: u8 = 11;
 
 fn next_rand(seed: u64) -> u64 {
     let mut x = seed;
@@ -66,11 +67,15 @@ fn next_rand(seed: u64) -> u64 {
 
 /*
 TODO:
-  winning condition
-  auto-open empty fields
+  ✅ winning condition
+  ✅ auto-open empty fields
   randomize possible field on every guess
+
+  Nice to have:
+  Allow multi-open
   make sure first guess is not a bug
   store sequence of moves
+  award NFT on game win
 */
 impl Game {
     fn set_field(&mut self, x: u8, y: u8, value: u8) {
@@ -118,7 +123,7 @@ impl Game {
 
                 let p = (r % 100) as u8;
                 if p < BUG_CHANCE_100 {
-                    self.set_field(i, j, BUG);
+                    self.set_field(i, j, HIDDEN_BUG);
                 }
                 r = next_rand(r);
             }
@@ -135,7 +140,7 @@ impl Game {
                 let fieldval = self.get_field(i, j);
                 if fieldval == BUG {
                     res.push_str("X");
-                } else if fieldval == UNOPENED {
+                } else if fieldval == UNOPENED || fieldval == HIDDEN_BUG {
                     res.push_str(" ");
                 } else {
                     res.push_str(&fieldval.to_string());
@@ -158,16 +163,17 @@ impl Game {
         }
 
         let field = self.get_field(x, y);
-        if field != BUG && field != UNOPENED {
+        if field != HIDDEN_BUG && field != UNOPENED {
             return Err(GameError::FieldAlreadyOpened(FieldAlreadyOpened {}));
         }
-        if field == BUG {
+        if field == HIDDEN_BUG {
             evm::log(FieldOpened {
                 player: msg::sender(),
                 x,
                 y,
-                value: field,
+                value: BUG,
             });
+            self.set_field(x, y, BUG);
             evm::log(GameOver {
                 player: msg::sender(),
                 won: false,
@@ -176,6 +182,63 @@ impl Game {
             return Ok(BUG);
         }
 
+        let count = self.do_open(x, y);
+        // Check if won
+        let mut won = true;
+        for i in 0..WIDTH {
+            for j in 0..HEIGHT {
+                let field = self.get_field(i, j);
+                if field == UNOPENED {
+                    won = false;
+                    break;
+                }
+            }
+        }
+        if won {
+            evm::log(GameOver {
+                player: msg::sender(),
+                won: true,
+            });
+            self.state.set(Uint::from(STATE_WON));
+        }
+        Ok(count)
+    }
+
+    fn do_open(&mut self, x: u8, y: u8) -> u8 {
+        let count = self.count_adjacent(x, y);
+        evm::log(FieldOpened {
+            player: msg::sender(),
+            x,
+            y,
+            value: count,
+        });
+        self.set_field(x, y, count);
+
+        if count == 0 {
+            self.open_adjacent(x, y);
+        }
+        count
+    }
+
+    fn open_adjacent(&mut self, x: u8, y: u8) {
+        for i in -1..=1 {
+            for j in -1..=1 {
+                if i == 0 && j == 0 {
+                    continue;
+                }
+                let x = x as i8 + i;
+                let y = y as i8 + j;
+                if x < 0 || x as u8 >= WIDTH || y < 0 || y as u8 >= HEIGHT {
+                    continue;
+                }
+                if self.get_field(x as u8, y as u8) == UNOPENED {
+                    self.do_open(x as u8, y as u8);
+                }
+            }
+        }
+    }
+
+    fn count_adjacent(&mut self, x: u8, y: u8) -> u8 {
         let mut count = 0;
         for i in -1..=1 {
             for j in -1..=1 {
@@ -187,20 +250,13 @@ impl Game {
                 if x < 0 || x as u8 >= WIDTH || y < 0 || y as u8 >= HEIGHT {
                     continue;
                 }
-                if self.get_field(x as u8, y as u8) == BUG {
+                let value = self.get_field(x as u8, y as u8);
+                if value == BUG || value == HIDDEN_BUG {
                     count += 1;
                 }
             }
         }
-
-        evm::log(FieldOpened {
-            player: msg::sender(),
-            x,
-            y,
-            value: count,
-        });
-        self.set_field(x, y, count);
-        Ok(count)
+        count
     }
 
     pub fn is_started(&self) -> bool {

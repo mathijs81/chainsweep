@@ -1,17 +1,49 @@
 <script setup lang="ts">
 const props = defineProps<{
     board: string[][];
+    clickEnabled: boolean;
 }>();
+const emit = defineEmits(['clickCell']);
 
 const width = computed(() => props.board[0].length);
 const height = computed(() => props.board.length);
+
+function getClass(cell: string) {
+    return {
+        'unopened': cell === ' ',
+        'bug': cell === 'X',
+        ...[...Array(8).keys()].reduce((acc, i) => {
+            acc[`around-${i}`] = cell === i.toString();
+            return acc;
+        }, {} as Record<string, boolean>),
+    };
+}
+function formatCell(cell: String) {
+    if (cell === '0') {
+        return '';
+    }
+    if (cell === 'X') {
+        return '';
+    }
+    return cell;
+}
+function click(x: number, y:number) {
+    if (!props.clickEnabled) {
+        return;
+    }
+    const cell = props.board[y][x];
+    if (cell !== ' ') {
+        return;
+    }
+    emit('clickCell', { x, y })
+}
 </script>
 
 <template>
     <div class="board d-inline-block">
         <div v-for="(row, y) in props.board" :key="y" class="d-flex gridrow">
-            <div v-for="(cell, x) in row" :key="x" class="gridcell" @click="$emit('clickCell', { x, y })">
-                {{ cell }}
+            <div v-for="(cell, x) in row" :key="x" class="gridcell" :class="getClass(cell)" @click="click(x,y)">
+                {{ formatCell(cell) }}
             </div>
         </div>
     </div>
@@ -36,8 +68,24 @@ $cellSize: 50px;
     display: flex;
     justify-content: center;
     align-items: center;
+    font-weight: bold;
+}
+.unopened {
+    background-color: #ddd;
+    cursor: pointer;
     &:hover {
         background-color: #eee;
+    }
+}
+.bug {
+    background-color: #fee;
+    &::before {
+        content: '';
+        display: block;
+        width: 100%;
+        padding-top: 100%;
+        background: url('../img/bug.png');
+        background-size: cover;
     }
 }
 </style>

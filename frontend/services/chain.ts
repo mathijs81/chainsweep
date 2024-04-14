@@ -1,12 +1,10 @@
 
-import { mainnet, arbitrum } from 'viem/chains'
-import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Client, type WalletClient } from 'viem';
+import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Client, type PublicClient, type WalletClient, type WatchEventReturnType } from 'viem';
 
 import { getContract } from 'viem';
 import { chainsweepAbi } from '../src/generated';
 
-const contractAddress = '0x4bf010f1b9beDA5450a8dD702ED602A104ff65EE';
-
+const contractAddress = '0xd9140951d8aE6E5F625a02F5908535e16e3af964';
 
 export const targetChain = defineChain({
     id: 412346,
@@ -59,13 +57,16 @@ export class Game {
 }
 
 class Web3Service {
-    private publicClient: Client = createPublicClient({
+    private publicClient: PublicClient = createPublicClient({
         chain: targetChain,
         transport: http()
     });
     private client: WalletClient | null = null;
     private address: Ref<Address | null> = ref(null);
     private currentGame: Ref<Game | null> = ref(null);
+    //private watcher: WatchContractEventReturnType | null = null;
+    private watcher: WatchEventReturnType | null = null;
+    
 
     private contract() {
         const contract = getContract({
@@ -99,23 +100,45 @@ class Web3Service {
             if (chainId !== targetChain.id) {
                 this.client.switchChain(targetChain);
             } else {
+                if (this.watcher != null) {
+                    this.watcher();
+                }
+                // TODO: fix watching for proper contract events, currently not possible
+                // because `cargo stylus export-abi` doesn't export the event data
+                // this.watcher = this.publicClient.watchContractEvent({
+                //     address: contractAddress,
+                //     abi: chainsweepAbi,
+                //     onLogs: logs => console.log(logs),
+                //     pollingInterval: 1000
+                // })
+                this.watcher = this.publicClient.watchEvent({
+                    address: contractAddress,
+                    onLogs: logs => {
+                        console.log('Event from contract, updating game state');
+                        this.loadGameState();
+                    }
+                })
                 const addresses = await this.client?.getAddresses();
                 this.address.value = addresses?.[0] ?? null;
                 console.log('got addresses', addresses);
                 if (this.address.value) {
-                    const result = await this.contract().read.viewFor([this.address.value]);
-                    console.log('viewFor result:', result);
-                    this.onGameUpdate(result);
+                    await this.loadGameState();
                 }
             }
         }
+    }
+
+    private async loadGameState() {
+        const result = await this.contract().read.viewFor([this.address.value!!]);
+        console.log('viewFor result:', result);
+        this.onGameUpdate(result);
     }
 
     private onGameUpdate(result: string) {
         if (result.includes('not started')) {
             this.currentGame.value = null;
         }
-        const lines = result.trim().split('\n');
+        const lines = result.trimEnd().split('\n');
         const game = new Game();
         game.state = GameState.PLAYING;
         const lastLine = lines[lines.length - 1];
@@ -131,9 +154,13 @@ class Web3Service {
     }
 
     clickCell(x: number, y: number) {
-        this.contract().write.makeGuess([x, y]).then(result => {
+        this.contract().write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain }).then(result => {
             console.log('Click on cell', x, y, 'result:', result);
         });
+    }
+
+    newGame() {
+        this.contract().write.newGame({ account: this.client!!.account!!, chain: targetChain });
     }
 }
 

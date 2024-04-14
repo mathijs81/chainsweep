@@ -10,9 +10,16 @@ const currentBoard = computed(() => {
     return game.field.map(row => [...row]);
 });
 
+const gameState = computed(() => {
+    return web3Service.getCurrentGame().value?.state;
+});
+
 function click(data: { x: number, y: number }) {
     //console.log(`Clicked at ${data.x}, ${data.y}`);
     web3Service.clickCell(data.x, data.y);
+}
+function newGame() {
+    web3Service.newGame();
 }
 </script>
 
@@ -27,7 +34,18 @@ function click(data: { x: number, y: number }) {
             around it have bugs.
             If you click a block with a bug, the game is over. When you've validated all blocks without bugs, you win!
         </p>
-        <GameBoard v-if="currentBoard" :board="currentBoard" @clickCell="click" />
+        <GameBoard v-if="currentBoard" :clickEnabled="gameState === GameState.PLAYING" :board="currentBoard"
+            @clickCell="click" />
+        <div v-if="gameState === GameState.WON" class="alert alert-success" role="alert">
+            You won!
+        </div>
+        <div v-if="gameState === GameState.LOST" class="alert alert-warning" role="alert">
+            You lost!
+        </div>
+        <div v-if="gameState !== GameState.PLAYING" class="text-center">
+            <button class="btn btn-primary" @click="newGame()">Start New Game</button>
+        </div>
+
     </div>
 </template>
 

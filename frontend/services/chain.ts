@@ -56,7 +56,7 @@ export class Game {
     }
 }
 
-class Web3Service {
+class Web3Service extends EventTarget {
     private publicClient: PublicClient = createPublicClient({
         chain: targetChain,
         transport: http()
@@ -66,9 +66,16 @@ class Web3Service {
     private currentGame: Ref<Game | null> = ref(null);
     //private watcher: WatchContractEventReturnType | null = null;
     private watcher: WatchEventReturnType | null = null;
-    
+
+    private fireShouldConnect() {
+        this.dispatchEvent(new Event('should-connect'));
+    }
 
     private contract() {
+        if (this.client == null) {
+            this.fireShouldConnect();
+            return null;
+        }
         const contract = getContract({
             address: contractAddress,
             abi: chainsweepAbi,
@@ -92,46 +99,51 @@ class Web3Service {
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
             const account = accounts[0] as Address;
             console.log('got account', account);
-            this.client = createWalletClient({
-                chain: targetChain,
-                transport: custom(window.ethereum),
-                account,
-            });
-            if (chainId !== targetChain.id) {
-                this.client.switchChain(targetChain);
-            } else {
-                if (this.watcher != null) {
-                    this.watcher();
-                }
-                // TODO: fix watching for proper contract events, currently not possible
-                // because `cargo stylus export-abi` doesn't export the event data
-                // this.watcher = this.publicClient.watchContractEvent({
-                //     address: contractAddress,
-                //     abi: chainsweepAbi,
-                //     onLogs: logs => console.log(logs),
-                //     pollingInterval: 1000
-                // })
-                this.watcher = this.publicClient.watchEvent({
-                    address: contractAddress,
-                    onLogs: logs => {
-                        console.log('Event from contract, updating game state');
-                        this.loadGameState();
+            // defer next step for a second, seems to work better with switch chain
+            setTimeout(async () => {
+                this.client = createWalletClient({
+                    chain: targetChain,
+                    transport: custom(window.ethereum!!),
+                    account,
+                });
+                if (chainId !== targetChain.id) {
+                    this.client!!.switchChain(targetChain);
+                } else {
+                    if (this.watcher != null) {
+                        this.watcher();
                     }
-                })
-                const addresses = await this.client?.getAddresses();
-                this.address.value = addresses?.[0] ?? null;
-                console.log('got addresses', addresses);
-                if (this.address.value) {
-                    await this.loadGameState();
+                    // TODO: fix watching for proper contract events, currently not possible
+                    // because `cargo stylus export-abi` doesn't export the event data
+                    // this.watcher = this.publicClient.watchContractEvent({
+                    //     address: contractAddress,
+                    //     abi: chainsweepAbi,
+                    //     onLogs: logs => console.log(logs),
+                    //     pollingInterval: 1000
+                    // })
+                    this.watcher = this.publicClient.watchEvent({
+                        address: contractAddress,
+                        onLogs: logs => {
+                            console.log('Event from contract, updating game state');
+                            this.loadGameState();
+                        }
+                    })
+                    const addresses = await this.client?.getAddresses();
+                    this.address.value = addresses?.[0] ?? null;
+                    console.log('got addresses', addresses);
+                    if (this.address.value) {
+                        await this.loadGameState();
+                    }
                 }
-            }
+            }, 1000);
         }
     }
 
     private async loadGameState() {
-        const result = await this.contract().read.viewFor([this.address.value!!]);
-        console.log('viewFor result:', result);
-        this.onGameUpdate(result);
+        const result = await this.contract()?.read?.viewFor([this.address.value!!]);
+        if (result != null) {
+            console.log('viewFor result:', result);
+            this.onGameUpdate(result);
+        }
     }
 
     private onGameUpdate(result: string) {
@@ -154,13 +166,13 @@ class Web3Service {
     }
 
     clickCell(x: number, y: number) {
-        this.contract().write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain }).then(result => {
+        this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain }).then(result => {
             console.log('Click on cell', x, y, 'result:', result);
         });
     }
 
     newGame() {
-        this.contract().write.newGame({ account: this.client!!.account!!, chain: targetChain });
+        this.contract()?.write.newGame({ account: this.client!!.account!!, chain: targetChain });
     }
 }
 

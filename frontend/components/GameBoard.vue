@@ -11,6 +11,7 @@ const height = computed(() => props.board.length);
 function getClass(cell: string) {
     return {
         'unopened': cell === ' ',
+        'openable': cell === ' ' && props.clickEnabled,
         'bug': cell === 'X',
         ...[...Array(8).keys()].reduce((acc, i) => {
             acc[`around-${i}`] = cell === i.toString();
@@ -24,6 +25,9 @@ function formatCell(cell: String) {
     }
     if (cell === 'X') {
         return '';
+    }
+    if (cell === ' ') {
+        return 'Validate';
     }
     return cell;
 }
@@ -72,9 +76,13 @@ $cellSize: 50px;
 }
 .unopened {
     background-color: #ddd;
+    color: transparent;
     cursor: pointer;
-    &:hover {
+    &.openable:hover {
+        font-family: monospace;
         background-color: #eee;
+        color: #333;
+        z-index: 3;
     }
 }
 .bug {

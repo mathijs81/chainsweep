@@ -5,12 +5,13 @@ import detectEthereumProvider from '@metamask/detect-provider';
 // TODO: most of this code should move to web3Service
 const error = web3Service.getError();
 const address = web3Service.getAddress();
-const isConnected = computed(() => address.value != null && address.value != '');
+const isConnected = computed(() => address.value != null);
 
 async function connect() {
     async function getChainId() {
         const chainId = await window.ethereum?.request({ method: 'eth_chainId' });
         if (chainId) {
+            console.log('retrieved chain ID', chainId);
             return parseInt(chainId, 16);
         }
         return null;
@@ -73,6 +74,14 @@ onMounted(() => {
     web3Service.addEventListener('should-connect', () => {
         connect();
     });
+    if (localStorage.getItem('autoconnect') === 'true') {
+        connect();
+    }
+    watchEffect(() => {
+        if (isConnected.value) {
+            localStorage.setItem('autoconnect', 'true');
+        }
+    })
 });
 </script>
 

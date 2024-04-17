@@ -6,12 +6,13 @@ license = "Apache-2.0"
 homepage = "https://github.com/mathijs81/scaling-ethereum-2024"
 repository = "https://github.com/mathijs81/scaling-ethereum-2024"
 keywords = ["arbitrum", "ethereum", "stylus", "scaling", "hackathon"]
-description = "Submission for Scaling Ethereum 2024 hackathon"
+description = "Chainsweep: an on-chain game on Arbitrum Stylus"
 
 [dependencies]
 alloy-primitives = "0.3.1"
 alloy-sol-types = "0.3.1"
-stylus-sdk = { version = "0.4.3", features = ["debug"] }
+#stylus-sdk = { version = "0.4.3", features = ["debug"] }
+stylus-sdk = "0.4.3"
 mini-alloc = "0.4.2"
 fastrand = { version = "2.0.2", default-features = false }
 

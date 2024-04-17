@@ -1,41 +1,9 @@
 
-import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Client, type PublicClient, type WalletClient, type WatchEventReturnType } from 'viem';
+import { createPublicClient, createWalletClient, custom, http, type Address, type PublicClient, type WalletClient, type WatchEventReturnType } from 'viem';
 
 import { getContract } from 'viem';
 import { chainsweepAbi } from '../src/generated';
-
-const contractAddress = '0xd9140951d8aE6E5F625a02F5908535e16e3af964';
-
-export const targetChain = defineChain({
-    id: 412346,
-    name: "Stylus Devnet",
-    network: "Arbitrum Stylus",
-    nativeCurrency: {
-        decimals: 18,
-        name: "Ether",
-        symbol: "ETH",
-    },
-    rpcUrls: {
-        default: {
-            http: ["http://localhost:8547"],
-            webSocket: [
-                "wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
-            ],
-        },
-        public: {
-            http: ["http://localhost:8547"],
-            webSocket: [
-                "wss://mainnet.infura.io/ws/v3/68c04ec6f9ce42c5becbed52a464ef81",
-            ],
-        },
-    },
-    blockExplorers: {
-        default: {
-            name: "Explorer",
-            url: "https://stylus-testnet-explorer.arbitrum.io/",
-        },
-    },
-});
+import { contractAddress, targetChain } from './constants';
 
 export enum GameState {
     UNSTARTED,
@@ -119,9 +87,19 @@ class Web3Service extends EventTarget {
                     transport: custom(window.ethereum!!),
                     account,
                 });
+                console.log('getting addresses');
+                const addresses = await this.client?.getAddresses();
+                this.address.value = addresses?.[0] ?? null;
+                console.log('got addresses', addresses);
+
                 if (chainId !== targetChain.id) {
                     console.log('initiating chain switch', chainId, targetChain.id);
                     try {
+                        try {
+                            await this.client!!.addChain({ chain: targetChain });
+                        } catch(e) {
+                            // Ignore error if chain already exists
+                        }
                         await this.client!!.switchChain(targetChain);
                     } catch (e) {
                         console.error('switch chain error', e);
@@ -147,10 +125,8 @@ class Web3Service extends EventTarget {
                             this.loadGameState();
                         }
                     })
-                    console.log('getting addresses');
-                    const addresses = await this.client?.getAddresses();
-                    this.address.value = addresses?.[0] ?? null;
-                    console.log('got addresses', addresses);
+                    this.setError(null);
+                   
                     if (this.address.value) {
                         await this.loadGameState();
                     }
@@ -187,12 +163,20 @@ class Web3Service extends EventTarget {
         this.currentGame.value = game;
     }
 
-    clickCell(x: number, y: number) {
-        this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain,
-            gas: 200_000n
-         }).then(result => {
-            console.log('Click on cell', x, y, 'result:', result);
-        });
+    async clickCell(x: number, y: number) {
+        try {
+            const gasEstimate = await this.contract()?.estimateGas.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain });
+            if (gasEstimate === undefined) {
+                throw new Error('Gas estimation failed');
+            }
+            const tx = await this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain,
+                gas: gasEstimate * 2n + 100_000n
+            });
+        } catch(e) {
+            console.error('makeGuess error', e);
+            this.setError('Error: ' + e.message);
+            setTimeout(() => this.setError(null), 5000);
+        }
     }
 
     newGame() {

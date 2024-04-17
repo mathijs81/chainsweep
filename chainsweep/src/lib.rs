@@ -1,17 +1,21 @@
-#![cfg_attr(not(feature = "export-abi"), no_main)]
+#![cfg_attr(not(any(feature = "export-abi", test)), no_main)]
+#![cfg_attr(not(any(feature = "export-abi", test)), no_std)]
+
+mod sweeper;
+mod field;
+
 extern crate alloc;
 
 /// Use an efficient WASM allocator.
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
-use alloy_primitives::Address;
-/// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{block, evm, msg, prelude::*};
-use sweeper::{GameAlreadyStarted, GameError, GameStarted};
 
-mod sweeper;
-use crate::sweeper::Game;
+use alloc::{string::String, vec::Vec};
+
+use alloy_primitives::Address;
+use stylus_sdk::{block, evm, msg, prelude::*};
+use sweeper::{GameAlreadyStarted, GameError, GameStarted, Game};
 
 sol_storage! {
     #[entrypoint]
@@ -49,3 +53,4 @@ impl SweeperGame {
         game.make_guess(x, y)
     }
 }
+

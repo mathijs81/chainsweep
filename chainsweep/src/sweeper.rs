@@ -1,16 +1,25 @@
 use alloy_primitives::{Uint, U256};
 use alloy_sol_types::sol;
 use stylus_sdk::{
-    evm, msg,
-    prelude::*,
-    storage::{StorageArray, StorageU256, StorageU8},
+    console, evm, msg, prelude::*, storage::{StorageU256, StorageU8}
 };
 
-// Field size is fixed
-// This will fit in two u256
-const WIDTH: u8 = 11;
-const HEIGHT: u8 = 11;
+use alloc::{string::{String, ToString}, vec::Vec};
 
+
+use crate::field::{is_open, next_rand, Field, GameData, BUG, UNOPENED, UNOPENED_BUG};
+
+// Field size is fixed
+// This will fit in one u256 (4 bits * 8 * 8 = 256 bits)
+// const WIDTH: u8 = 8;
+// const HEIGHT: u8 = 8;
+
+// The current setup with a metamask confirmation for every field
+// is not very user friendly, so we'll keep the field size small
+const WIDTH: u8 = 5;
+const HEIGHT: u8 = 5;
+
+// Chance of every field being a bug, as a percentage
 const BUG_CHANCE_100: u8 = 20;
 
 sol! {
@@ -46,25 +55,9 @@ const STATE_WON: GameState = 3;
 
 #[solidity_storage]
 pub struct Game {
-    board_encoded: StorageArray<StorageU256, 2>,
+    board_encoded: StorageU256,
     state: StorageU8,
 }
-
-// We encode each field in 4 bits.
-// 0-8 = opened, number of bugs around
-// 9 = bug
-// 10 = unopened
-
-const BUG: u8 = 9;
-const UNOPENED: u8 = 10;
-const HIDDEN_BUG: u8 = 11;
-
-fn next_rand(seed: u64) -> u64 {
-    let mut x = seed;
-    x = ((x + 1337) * 16807) % 0x7FFFFFFF;
-    x
-}
-
 /*
 TODO:
   ✅ winning condition
@@ -81,37 +74,32 @@ impl Game {
     fn set_field(&mut self, x: u8, y: u8, value: u8) {
         let field = (x + y * WIDTH) as usize;
         let field_bit_offset = field * 4;
-        // let field_uint_offset = field_bit_offset / 64;
-        // let field_shift = field_bit_offset % 64;
-        // let mask = 0xFu64 << field_shift;
-        // let value = (value as u64) << field_shift;
-        let mut current256: [u8; 32] = self
-            .board_encoded
-            .get(field_bit_offset / 256)
-            .unwrap()
-            .to_le_bytes();
-        let byte_index = (field_bit_offset % 256) / 8;
-        let byte_shift = (field_bit_offset % 256) % 8;
-        let mask = 0xFu8 << byte_shift;
-        current256[byte_index] = (current256[byte_index] & !mask) | (value << byte_shift);
-        self.board_encoded
-            .setter(field_bit_offset / 256)
-            .unwrap()
-            .set(U256::from_le_bytes(current256));
+
+        let mut current256: [u8; 32] = self.board_encoded.get().to_le_bytes();
+        let byte_index = field_bit_offset / 8;
+        let bit_shift = field_bit_offset % 8;
+        let mask = 0xFu8 << bit_shift;
+        current256[byte_index] = (current256[byte_index] & !mask) | (value << bit_shift);
+        self.board_encoded.set(U256::from_le_bytes(current256));
     }
 
-    fn get_field(&self, x: u8, y: u8) -> u8 {
-        let field = (x + y * WIDTH) as usize;
-        let field_bit_offset = field * 4;
-        let current256: [u8; 32] = self
-            .board_encoded
-            .get(field_bit_offset / 256)
-            .unwrap()
-            .to_le_bytes();
-        let byte_index = (field_bit_offset % 256) / 8;
-        let byte_shift = (field_bit_offset % 256) % 8;
-        let mask = 0xFu8 << byte_shift;
-        (current256[byte_index] & mask) >> byte_shift
+    fn get_field(&self) -> GameData {
+        let current256: [u8; 32] = self.board_encoded.get().to_le_bytes();
+        let mut fields = Vec::new();
+        let mut index = 0;
+        for y in 0..HEIGHT {
+            for x in 0..WIDTH {
+                let mut field_byte = current256[index / 2];
+                if index % 2 == 1 {
+                    field_byte >>= 4;
+                } else {
+                    field_byte &= 0xF;
+                }
+                fields.push(field_byte);
+                index += 1;
+            }
+        }
+        GameData::new(WIDTH, HEIGHT, fields)
     }
 
     pub fn init(&mut self, rand_seed: u64) {
@@ -123,24 +111,29 @@ impl Game {
 
                 let p = (r % 100) as u8;
                 if p < BUG_CHANCE_100 {
-                    self.set_field(i, j, HIDDEN_BUG);
+                    self.set_field(i, j, UNOPENED_BUG);
                 }
                 r = next_rand(r);
             }
         }
     }
-
+            
     pub fn print(&self) -> String {
+        self.print_with_bugs(false)
+    }
+
+    fn print_with_bugs(&self, with_bugs: bool) -> String {
         if self.state.get().byte(0) == STATE_NOT_STARTED {
             return "Game not started".to_string();
         }
+        let field_data = self.get_field();
         let mut res = String::new();
         for j in 0..HEIGHT {
             for i in 0..WIDTH {
-                let fieldval = self.get_field(i, j);
-                if fieldval == BUG {
+                let fieldval = field_data.get(i, j).data;
+                if fieldval == BUG || (fieldval == UNOPENED_BUG && with_bugs) {
                     res.push_str("X");
-                } else if fieldval == UNOPENED || fieldval == HIDDEN_BUG {
+                } else if fieldval == UNOPENED || fieldval == UNOPENED_BUG {
                     res.push_str(" ");
                 } else {
                     res.push_str(&fieldval.to_string());
@@ -162,11 +155,12 @@ impl Game {
             return Err(GameError::GameAlreadyOver(GameAlreadyOver {}));
         }
 
-        let field = self.get_field(x, y);
-        if field != HIDDEN_BUG && field != UNOPENED {
+        let mut field_data = self.get_field();
+        let field = field_data.get(x, y).data;
+        if is_open(field) {
             return Err(GameError::FieldAlreadyOpened(FieldAlreadyOpened {}));
         }
-        if field == HIDDEN_BUG {
+        if field == UNOPENED_BUG {
             evm::log(FieldOpened {
                 player: msg::sender(),
                 x,
@@ -182,12 +176,12 @@ impl Game {
             return Ok(BUG);
         }
 
-        let count = self.do_open(x, y);
+        let count = self.do_open(x, y, &mut field_data);
         // Check if won
         let mut won = true;
         for i in 0..WIDTH {
             for j in 0..HEIGHT {
-                let field = self.get_field(i, j);
+                let field = field_data.get(i, j).data;
                 if field == UNOPENED {
                     won = false;
                     break;
@@ -201,11 +195,13 @@ impl Game {
             });
             self.state.set(Uint::from(STATE_WON));
         }
+
+        console!("current field: {}", self.print_with_bugs(true));
         Ok(count)
     }
 
-    fn do_open(&mut self, x: u8, y: u8) -> u8 {
-        let count = self.count_adjacent(x, y);
+    fn do_open(&mut self, x: u8, y: u8, field_data: &mut GameData) -> u8 {
+        let count = field_data.get(x, y).adjacent_bugs;
         evm::log(FieldOpened {
             player: msg::sender(),
             x,
@@ -213,14 +209,15 @@ impl Game {
             value: count,
         });
         self.set_field(x, y, count);
+        field_data.set_data(x, y, count);
 
         if count == 0 {
-            self.open_adjacent(x, y);
+            self.open_adjacent(x, y, field_data);
         }
         count
     }
 
-    fn open_adjacent(&mut self, x: u8, y: u8) {
+    fn open_adjacent(&mut self, x: u8, y: u8, field_data: &mut GameData) {
         for i in -1..=1 {
             for j in -1..=1 {
                 if i == 0 && j == 0 {
@@ -231,32 +228,11 @@ impl Game {
                 if x < 0 || x as u8 >= WIDTH || y < 0 || y as u8 >= HEIGHT {
                     continue;
                 }
-                if self.get_field(x as u8, y as u8) == UNOPENED {
-                    self.do_open(x as u8, y as u8);
+                if field_data.get(x as u8, y as u8).data == UNOPENED {
+                    self.do_open(x as u8, y as u8, field_data);
                 }
             }
         }
-    }
-
-    fn count_adjacent(&mut self, x: u8, y: u8) -> u8 {
-        let mut count = 0;
-        for i in -1..=1 {
-            for j in -1..=1 {
-                if i == 0 && j == 0 {
-                    continue;
-                }
-                let x = x as i8 + i;
-                let y = y as i8 + j;
-                if x < 0 || x as u8 >= WIDTH || y < 0 || y as u8 >= HEIGHT {
-                    continue;
-                }
-                let value = self.get_field(x as u8, y as u8);
-                if value == BUG || value == HIDDEN_BUG {
-                    count += 1;
-                }
-            }
-        }
-        count
     }
 
     pub fn is_started(&self) -> bool {

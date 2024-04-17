@@ -81,7 +81,7 @@ class Web3Service extends EventTarget {
     }
 
     private contract() {
-        if (this.client == null) {
+        if (this.address.value == null || this.client == null) {
             this.fireShouldConnect();
             return null;
         }
@@ -170,6 +170,7 @@ class Web3Service extends EventTarget {
     private onGameUpdate(result: string) {
         if (result.includes('not started')) {
             this.currentGame.value = null;
+            return;
         }
         const lines = result.trimEnd().split('\n');
         const game = new Game();

@@ -1,14 +1,11 @@
 <script lang="ts" setup>
-//import { BrowserWalletConnector, VueDappProvider, type ConnWallet, useVueDapp } from '@vue-dapp/core'
-//import { VueDappModal } from '@vue-dapp/modal'
-//import '@vue-dapp/modal/dist/style.css'
 import { web3Service } from '../services/chain';
 import detectEthereumProvider from '@metamask/detect-provider';
 
-// const { isConnected, address, chainId, error, disconnect, addConnector } = useVueDapp()
-const isConnected = ref(false);
+// TODO: most of this code should move to web3Service
 const error = web3Service.getError();
 const address = web3Service.getAddress();
+const isConnected = computed(() => address.value != null && address.value != '');
 
 async function connect() {
     async function getChainId() {
@@ -36,13 +33,8 @@ async function connect() {
                         web3Service.setError('Could not get chain ID');
                         return;
                     }
-                    isConnected.value = true;
                     web3Service.onConnect(chainId);
                     ethereum.on('accountsChanged', async (accounts: string[]) => {
-                        if (accounts.length === 0) {
-                            isConnected.value = false;
-                            return;
-                        }
                         web3Service.onConnect((await getChainId())!!);
                     });
                     ethereum.on('chainChanged', async (chainId: string) => {
@@ -71,25 +63,17 @@ async function connect() {
 
 function onClickConnectBtn() {
     if (isConnected.value) {
-        isConnected.value = false;
         window.ethereum?.request({ method: 'eth_requestAccounts', params: [{eth_accounts: {}}]});
     } else {
         connect();
     }
 }
 
-if (process.client) { // only when using Nuxt 3
-    // useVueDapp().onAccountOrChainIdChanged((wallet: ConnWallet) => {
-    //     web3Service.onConnect(wallet.chainId);
-    // });
-
-
-    onMounted(() => {
-        web3Service.addEventListener('should-connect', () => {
-            connect();
-        });
+onMounted(() => {
+    web3Service.addEventListener('should-connect', () => {
+        connect();
     });
-}
+});
 </script>
 
 <template>
@@ -109,9 +93,7 @@ if (process.client) { // only when using Nuxt 3
                     </div>
                 </div>
                 <div class="col col-auto">
-                    <button class="btn btn-primary" @click="onClickConnectBtn">{{ isConnected ? 'Disconnect' :
-                        'Connect'
-                        }}</button>
+                    <button class="btn btn-primary" @click="onClickConnectBtn" v-if="!isConnected">Connect</button>
                 </div>
             </div>
         </div>

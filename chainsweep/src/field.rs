@@ -1,4 +1,5 @@
-use alloc::vec::Vec;
+use alloc::{vec::Vec, string::String};
+use fastrand::Rng;
 
 #[derive(Clone)]
 pub struct Field {
@@ -28,12 +29,6 @@ pub const UNOPENED_BUG: u8 = 12;
 
 pub fn is_open(data: u8) -> bool {
     data < UNOPENED
-}
-
-pub fn next_rand(seed: u64) -> u64 {
-    let mut x = seed;
-    x = ((x + 1337) * 16807) % 0x7FFFFFFF;
-    x
 }
 
 impl GameData {
@@ -69,11 +64,11 @@ impl GameData {
                             bugs += 1;
                         }
                         if add_impact {                            
-                            field.impacted_by.push(index);
+                            field.impacts.push(index);
                         }
                         // end of lifetime 'field'
                         if add_impact {
-                            fields[index as usize].impacts.push(other_index);
+                            fields[index as usize].impacted_by.push(other_index);
                         }
                     }
                 }
@@ -95,6 +90,141 @@ impl GameData {
     pub fn set_data(&mut self, x: u8, y: u8, data: u8) {
         self.fields[(y as usize)*(self.width as usize) + (x as usize)].data = data;
     }
+
+
+    fn surrounding_fields(&self, x: u8, y: u8) -> Vec<usize> {
+        let mut result = Vec::new();
+        for i in -1..=1 {
+            for j in -1..=1 {
+                if i == 0 && j == 0 {
+                    continue;
+                }
+                let x = x as i8 + i;
+                let y = y as i8 + j;
+                if x < 0 || x as u8 >= self.width || y < 0 || y as u8 >= self.height {
+                    continue;
+                }
+                let index = (y as usize)*(self.width as usize) + (x as usize);
+                result.push(index);
+            }
+        }
+        result
+    }
+
+    fn try_field(&mut self, handle_fields: &Vec<(u8, u8)>, proposed_bugs: u64, is_bug: bool) -> Result<(), ()> {
+        let (x, y) = handle_fields[0];
+        // Update all fields around and check that they're OK
+        let my_index = y * self.width + x;
+        assert!(self.fields[my_index as usize].data == UNOPENED);
+        let mut all_ok = true;
+        if is_bug {
+            self.fields[my_index as usize].data = BUG;
+        } else {
+            self.fields[my_index as usize].data = UNOPENED_BUGFREE;
+        }
+        self.surrounding_fields(x, y).into_iter().for_each(|index| {
+            let field = &mut self.fields[index];
+            if is_bug {
+                field.adjacent_bugs += 1;
+            }
+            // remove this index from the impacted_by
+            field.impacted_by.retain(|&x| x != my_index);
+            all_ok = all_ok && (field.data > 8 || (field.data >= field.adjacent_bugs && field.data <= field.adjacent_bugs + (field.impacted_by.len() as u8)));
+        });
+
+        if all_ok {
+            let mut new_fields = handle_fields[1..].to_vec();
+            // Add not-yet existing ones from impacted fields
+            for index in self.fields[my_index as usize].impacts.iter() {
+                for target in self.fields[*index as usize].impacted_by.iter() {
+                    let (x, y) = (target % self.width, target / self.width);
+                    if !new_fields.contains(&(x, y)) {
+                        new_fields.push((x, y));
+                    }
+                }
+            }
+
+            if self.update_field(&new_fields, proposed_bugs).is_ok() {
+                return Ok(());
+            }
+        }
+
+        // Undo all changes
+        self.surrounding_fields(x, y).into_iter().for_each(|index| {
+            let field = &mut self.fields[index];
+            if is_bug {
+                field.adjacent_bugs -= 1;
+            }
+            field.impacted_by.push(my_index);
+        });
+        self.fields[my_index as usize].data = UNOPENED;
+
+        Err(())
+    }
+
+    fn update_field(&mut self, fields: &Vec<(u8, u8)>, proposed_bugs: u64) -> Result<(), ()> {
+        if fields.is_empty() {
+            return Ok(());
+        }
+        let proposed_bug = ((proposed_bugs >> (fields[0].0 * self.width + fields[0].1)) & 1) == 1;
+        if let Err(()) = self.try_field(fields, proposed_bugs, proposed_bug) {
+            self.try_field(fields, proposed_bugs, !proposed_bug)
+        } else {
+            Ok(())
+        }
+    }
+
+    // Fill in all unopened fields with either BUG or UNOPENED_BUGFREE so that the already opened 
+    // fields are consistent with the number of adjacent bugs
+    // Note: this is generating a mostly randomly sampled solution but not perfectly, especially when 
+    // bug_percentage is close to 0 or 100.
+    // We 'propose' a bug yes/no for every field and then try to 'fix up' the game to be consistent with
+    // the opened fields. This fix-up process is not randomized and so if the proposals are not very random
+    // (e.g. all 1 or all 0), the result will not be very random either.
+    pub fn fill_in(&self, rand: u64, bug_percentage: u8) -> GameData {
+        let mut r = Rng::with_seed(rand);
+        // bit in bugs is 1 if we will start trying with a bug in that field, 0 if we start with no bug
+        let mut bugs = 0u64;
+        for _ in 0..self.fields.len() {
+            let p = r.u8(0..100);
+            if p < bug_percentage {
+                bugs += 1;
+            }
+            bugs <<= 1;
+        }
+
+        let mut result = self.clone();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let field = &result.fields[(y as usize)*(self.width as usize) + (x as usize)];
+                if field.data == UNOPENED {
+                    let mut process_fields = Vec::new();
+                    process_fields.push((x,y));
+                    if let Err(()) = result.update_field(&process_fields, bugs) {
+                        panic!("Could not fill in field {} {}", x, y);
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut result = String::new();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let field = &self.fields[(y as usize)*(self.width as usize) + (x as usize)];
+                if (field.data == BUG || field.data == UNOPENED_BUG) {
+                    result.push('X');
+                } else {
+                    result.push_str(".");
+                }
+            }
+            result.push_str("\n");
+        }
+        result
+    }
+
 }
 
 
@@ -104,11 +234,13 @@ mod tests {
 
     #[test]
     fn test_init() {
+        let X = BUG;
+        let o = UNOPENED;
         let data = GameData::new(4, 4, vec![
-            10, 9, 10, 10,
-            9, 10, 10, 10,
-            10, 10, 10, 10,
-            9, 9, 9, 10
+            o, X, o, o,
+            X, o, o, o,
+            o, o, o, o,
+            X, X, X, o
         ]);
 
         let adjacent = data.fields.iter().map(|field| field.adjacent_bugs).collect::<Vec<u8>>();
@@ -118,4 +250,95 @@ mod tests {
             3, 4, 2, 1, 
             1, 2, 1, 1]);
     }
+
+    #[test]
+    fn test_impact() {
+        let X = BUG;
+        let o = UNOPENED;
+        let data = GameData::new(
+            4,4, vec![
+            X, X, o, o,
+            X, 4, 1, o,
+            o, o, o, o,
+            X, X, X, 2
+        ]);
+
+        assert_eq!(data.fields[0].impacts, vec![]);
+        assert_eq!(data.fields[0].impacted_by, vec![]);
+
+        assert_eq!(data.fields[2].impacts, vec![5, 6]);
+        assert_eq!(data.fields[2].impacted_by, vec![]);
+
+        assert_eq!(data.fields[5].impacts, vec![]);
+        assert_eq!(data.fields[5].impacted_by, vec![8, 9, 2, 10]);
+
+        assert_eq!(data.fields[12].impacts, vec![]);
+        assert_eq!(data.fields[12].impacted_by, vec![]);
+    }
+
+    #[test]
+    fn test_generate() {
+        let X = BUG;
+        let o = UNOPENED;
+        let data = GameData::new(
+            4,4, vec![
+            X, X, o, o,
+            X, 4, 1, o,
+            o, o, o, o,
+            X, X, X, 1
+        ]);
+
+        let z = UNOPENED_BUGFREE;
+
+        let filled_in = data.fill_in(63515, 20);
+
+        assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            X, X, z, z,
+            X, 4, 1, z,
+            X, z, z, z,
+            X, X, X, 1
+        ]);
+
+        let filled_in = GameData::new(5,5, vec![o; 25]).fill_in(666132615, 20);
+        assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            z, z, X, z, z,
+            z, X, z, X, z,
+            z, z, z, z, z,
+            z, z, z, z, z,
+            z, X, X, z, z
+        ]);
+
+        let filled_in = GameData::new(5,5, vec![o; 25]).fill_in(666132615, 80);
+        assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            z, X, X, X, X,
+            X, X, z, X, X,
+            X, X, X, X, X,
+            z, X, X, X, z,
+            X, X, X, X, X
+        ]);
+
+        let data = GameData::new(
+            4,4, vec![
+            o, o, o, o,
+            o, 4, 1, o,
+            o, o, o, o,
+            o, o, o, 1
+        ]);
+
+        let filled_in = data.fill_in(666132615, 25);
+        assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            X, X, z, z,
+            X, 4, 1, z,
+            X, z, z, z,
+            z, X, X, 1
+        ]);
+
+        assert_eq!(data.fill_in(13371, 25).fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            X, z, X, z,
+            X, 4, 1, z,
+            X, z, z, z,
+            z, X, X, 1
+        ]);
+    }
+  
 }

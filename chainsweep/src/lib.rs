@@ -11,7 +11,7 @@ extern crate alloc;
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 
 use alloy_primitives::Address;
 use stylus_sdk::{block, evm, msg, prelude::*};
@@ -32,12 +32,7 @@ impl SweeperGame {
         if game.is_started() && !game.is_ended() {
             return Err(GameError::GameAlreadyStarted(GameAlreadyStarted {}));
         }
-
-        let mut pseudo_random = block::timestamp() ^ block::gas_limit();
-
-        pseudo_random = pseudo_random ^ (pseudo_random >> 7);        
-
-        game.init(pseudo_random);
+        game.init();
         evm::log(GameStarted { player: caller });
 
         Ok(game.print())
@@ -50,7 +45,7 @@ impl SweeperGame {
     pub fn make_guess(&mut self, x: u8, y: u8) -> Result<u8, GameError> {
         let caller = msg::sender();
         let mut game = self.games.setter(caller);
-        game.make_guess(x, y)
+        game.make_guess(x, y, block::timestamp() ^ block::gas_limit())
     }
 }
 

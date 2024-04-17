@@ -36,6 +36,7 @@ function newGame() {
             </p>
         </div>
         <ClientOnly><GameBoard v-if="currentBoard" :clickEnabled="gameState === GameState.PLAYING" :board="currentBoard"
+            :state="gameState"
             @clickCell="click" />
         </ClientOnly>
         <div v-if="gameState === GameState.WON" class="alert alert-success game-result" role="alert">

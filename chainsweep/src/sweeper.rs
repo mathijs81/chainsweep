@@ -1,13 +1,17 @@
 use alloy_primitives::{Uint, U256};
 use alloy_sol_types::sol;
 use stylus_sdk::{
-    console, evm, msg, prelude::*, storage::{StorageU256, StorageU8}
+    console, evm, msg,
+    prelude::*,
+    storage::{StorageU256, StorageU8},
 };
 
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
-
-use crate::field::{is_open, next_rand, Field, GameData, BUG, UNOPENED, UNOPENED_BUG};
+use crate::field::{is_open, GameData, BUG, UNOPENED, UNOPENED_BUG, UNOPENED_BUGFREE};
 
 // Field size is fixed
 // This will fit in one u256 (4 bits * 8 * 8 = 256 bits)
@@ -62,7 +66,7 @@ pub struct Game {
 TODO:
   ✅ winning condition
   ✅ auto-open empty fields
-  randomize possible field on every guess
+  ✅ randomize possible field on every guess
 
   Nice to have:
   Allow multi-open
@@ -86,38 +90,27 @@ impl Game {
     fn get_field(&self) -> GameData {
         let current256: [u8; 32] = self.board_encoded.get().to_le_bytes();
         let mut fields = Vec::new();
-        let mut index = 0;
-        for y in 0..HEIGHT {
-            for x in 0..WIDTH {
-                let mut field_byte = current256[index / 2];
-                if index % 2 == 1 {
-                    field_byte >>= 4;
-                } else {
-                    field_byte &= 0xF;
-                }
-                fields.push(field_byte);
-                index += 1;
+        for index in 0..WIDTH * HEIGHT {
+            let mut field_byte = current256[(index / 2) as usize];
+            if index % 2 == 1 {
+                field_byte >>= 4;
+            } else {
+                field_byte &= 0xF;
             }
+            fields.push(field_byte);
         }
         GameData::new(WIDTH, HEIGHT, fields)
     }
 
-    pub fn init(&mut self, rand_seed: u64) {
+    pub fn init(&mut self) {
         self.state.set(Uint::from(STATE_PLAYING));
-        let mut r = rand_seed;
         for i in 0..WIDTH {
             for j in 0..HEIGHT {
                 self.set_field(i, j, UNOPENED);
-
-                let p = (r % 100) as u8;
-                if p < BUG_CHANCE_100 {
-                    self.set_field(i, j, UNOPENED_BUG);
-                }
-                r = next_rand(r);
             }
         }
     }
-            
+
     pub fn print(&self) -> String {
         self.print_with_bugs(false)
     }
@@ -150,17 +143,21 @@ impl Game {
         res
     }
 
-    pub fn make_guess(&mut self, x: u8, y: u8) -> Result<u8, GameError> {
+    pub fn make_guess(&mut self, x: u8, y: u8, rand_seed: u64) -> Result<u8, GameError> {
         if self.state.get().byte(0) != STATE_PLAYING {
             return Err(GameError::GameAlreadyOver(GameAlreadyOver {}));
         }
 
-        let mut field_data = self.get_field();
+        let field_data = self.get_field();
         let field = field_data.get(x, y).data;
         if is_open(field) {
             return Err(GameError::FieldAlreadyOpened(FieldAlreadyOpened {}));
         }
-        if field == UNOPENED_BUG {
+        // fill in the field with a possible solution
+        let mut filled_in = field_data.fill_in(rand_seed, BUG_CHANCE_100);
+        console!("filled in: \n{}", filled_in.to_string());
+
+        if filled_in.get(x, y).data == BUG {
             evm::log(FieldOpened {
                 player: msg::sender(),
                 x,
@@ -176,13 +173,13 @@ impl Game {
             return Ok(BUG);
         }
 
-        let count = self.do_open(x, y, &mut field_data);
+        let count = self.do_open(x, y, &mut filled_in);
         // Check if won
         let mut won = true;
         for i in 0..WIDTH {
             for j in 0..HEIGHT {
-                let field = field_data.get(i, j).data;
-                if field == UNOPENED {
+                let field = filled_in.get(i, j).data;
+                if field == UNOPENED_BUGFREE {
                     won = false;
                     break;
                 }
@@ -228,7 +225,7 @@ impl Game {
                 if x < 0 || x as u8 >= WIDTH || y < 0 || y as u8 >= HEIGHT {
                     continue;
                 }
-                if field_data.get(x as u8, y as u8).data == UNOPENED {
+                if !is_open(field_data.get(x as u8, y as u8).data) {
                     self.do_open(x as u8, y as u8, field_data);
                 }
             }

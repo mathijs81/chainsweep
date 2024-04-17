@@ -166,7 +166,9 @@ class Web3Service extends EventTarget {
     }
 
     clickCell(x: number, y: number) {
-        this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain }).then(result => {
+        this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain,
+            gas: 200_000
+         }).then(result => {
             console.log('Click on cell', x, y, 'result:', result);
         });
     }

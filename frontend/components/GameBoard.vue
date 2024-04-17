@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { GameState } from '~/services/chain';
+
 const props = defineProps<{
     board: string[][];
     clickEnabled: boolean;
+    state: GameState;
 }>();
 const emit = defineEmits(['clickCell']);
 
@@ -12,6 +15,7 @@ function getClass(cell: string) {
     return {
         'unopened': cell === ' ',
         'openable': cell === ' ' && props.clickEnabled,
+        'avoided-bug': cell === ' ' && props.state === GameState.WON,
         'bug': cell === 'X',
         ...[...Array(8).keys()].reduce((acc, i) => {
             acc[`around-${i}`] = cell === i.toString();
@@ -93,8 +97,7 @@ $cellSize: 50px;
         transform: scale(1.1);
     }
 }
-.bug {
-    background-color: #fee;
+.bug, .avoided-bug {
     &::before {
         content: '';
         display: block;
@@ -103,5 +106,11 @@ $cellSize: 50px;
         background: url('../img/bug.png');
         background-size: cover;
     }
+}
+.bug {
+    background-color: #fee;
+}
+.avoided-bug {
+    background-color: #efe;
 }
 </style>

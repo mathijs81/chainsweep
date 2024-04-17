@@ -11,7 +11,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::field::{is_open, GameData, BUG, UNOPENED, UNOPENED_BUG, UNOPENED_BUGFREE};
+use crate::field::{is_open, GameData, BUG, UNOPENED, UNOPENED_BUGFREE};
 
 // Field size is fixed
 // This will fit in one u256 (4 bits * 8 * 8 = 256 bits)
@@ -67,10 +67,10 @@ TODO:
   ✅ winning condition
   ✅ auto-open empty fields
   ✅ randomize possible field on every guess
+  ✅ make sure first guess is not a bug
 
   Nice to have:
   Allow multi-open
-  make sure first guess is not a bug
   store sequence of moves
   award NFT on game win
 */
@@ -112,10 +112,6 @@ impl Game {
     }
 
     pub fn print(&self) -> String {
-        self.print_with_bugs(false)
-    }
-
-    fn print_with_bugs(&self, with_bugs: bool) -> String {
         if self.state.get().byte(0) == STATE_NOT_STARTED {
             return "Game not started".to_string();
         }
@@ -124,9 +120,9 @@ impl Game {
         for j in 0..HEIGHT {
             for i in 0..WIDTH {
                 let fieldval = field_data.get(i, j).data;
-                if fieldval == BUG || (fieldval == UNOPENED_BUG && with_bugs) {
+                if fieldval == BUG {
                     res.push_str("X");
-                } else if fieldval == UNOPENED || fieldval == UNOPENED_BUG {
+                } else if fieldval == UNOPENED {
                     res.push_str(" ");
                 } else {
                     res.push_str(&fieldval.to_string());
@@ -148,10 +144,14 @@ impl Game {
             return Err(GameError::GameAlreadyOver(GameAlreadyOver {}));
         }
 
-        let field_data = self.get_field();
+        let mut field_data = self.get_field();
         let field = field_data.get(x, y).data;
         if is_open(field) {
             return Err(GameError::FieldAlreadyOpened(FieldAlreadyOpened {}));
+        }
+        // If this is the very first guess, make sure it's not a bug
+        if field_data.num_open == 0 {
+            field_data.set_data(x, y, UNOPENED_BUGFREE);
         }
         // fill in the field with a possible solution
         let mut filled_in = field_data.fill_in(rand_seed, BUG_CHANCE_100);
@@ -193,7 +193,7 @@ impl Game {
             self.state.set(Uint::from(STATE_WON));
         }
 
-        console!("current field: {}", self.print_with_bugs(true));
+        console!("current field: {}", self.print());
         Ok(count)
     }
 

@@ -14,6 +14,7 @@ pub struct GameData {
     fields: Vec<Field>,
     width: u8,
     height: u8,
+    pub num_open: u8,
 }
 
 // We encode each field in 4 bits, so make sure to use at most 0-15
@@ -25,7 +26,6 @@ pub struct GameData {
 pub const BUG: u8 = 9;
 pub const UNOPENED: u8 = 10;
 pub const UNOPENED_BUGFREE: u8 = 11;
-pub const UNOPENED_BUG: u8 = 12;
 
 pub fn is_open(data: u8) -> bool {
     data < UNOPENED
@@ -34,6 +34,7 @@ pub fn is_open(data: u8) -> bool {
 impl GameData {
     pub fn new(width: u8, height: u8, data: Vec<u8>) -> Self {
         let mut fields = Vec::new();
+        let mut num_open = 0;
         for y in 0..height {
             for x in 0..width {
                 let field = Field { data: data[(y as usize)*(width as usize) + (x as usize)], impacted_by: Vec::new(), impacts: Vec::new(), adjacent_bugs: 0u8 };
@@ -45,6 +46,9 @@ impl GameData {
             for x in 0..width {
                 let index = y * width + x;
                 let add_impact = fields[index as usize].data < BUG;
+                if add_impact {
+                    num_open += 1;
+                }
 
                 let mut bugs = 0u8;
                 for i in -1..=1 {
@@ -60,7 +64,7 @@ impl GameData {
                         let other_index = (y as u8) * width + (x as u8);
                         let field = &mut fields[other_index as usize];
                         let add_impact = add_impact && field.data == UNOPENED;
-                        if field.data == BUG || field.data == UNOPENED_BUG {
+                        if field.data == BUG {
                             bugs += 1;
                         }
                         if add_impact {                            
@@ -80,6 +84,7 @@ impl GameData {
             fields,
             width,
             height,
+            num_open,
         }
     }
 
@@ -166,7 +171,7 @@ impl GameData {
         if fields.is_empty() {
             return Ok(());
         }
-        let proposed_bug = ((proposed_bugs >> (fields[0].0 * self.width + fields[0].1)) & 1) == 1;
+        let proposed_bug = ((proposed_bugs >> (fields[0].0 * self.height + fields[0].1)) & 1) == 1;
         if let Err(()) = self.try_field(fields, proposed_bugs, proposed_bug) {
             self.try_field(fields, proposed_bugs, !proposed_bug)
         } else {
@@ -187,10 +192,10 @@ impl GameData {
         let mut bugs = 0u64;
         for _ in 0..self.fields.len() {
             let p = r.u8(0..100);
+            bugs <<= 1;
             if p < bug_percentage {
                 bugs += 1;
             }
-            bugs <<= 1;
         }
 
         let mut result = self.clone();
@@ -214,7 +219,7 @@ impl GameData {
         for y in 0..self.height {
             for x in 0..self.width {
                 let field = &self.fields[(y as usize)*(self.width as usize) + (x as usize)];
-                if (field.data == BUG || field.data == UNOPENED_BUG) {
+                if field.data == BUG {
                     result.push('X');
                 } else {
                     result.push_str(".");
@@ -229,6 +234,7 @@ impl GameData {
 
 
 #[cfg(test)]
+#[allow(non_snake_case)]
 mod tests {
     use super::*;
 
@@ -301,20 +307,20 @@ mod tests {
 
         let filled_in = GameData::new(5,5, vec![o; 25]).fill_in(666132615, 20);
         assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
-            z, z, X, z, z,
             z, X, z, X, z,
             z, z, z, z, z,
             z, z, z, z, z,
-            z, X, X, z, z
+            z, X, X, z, z,
+            z, X, z, z, z
         ]);
 
         let filled_in = GameData::new(5,5, vec![o; 25]).fill_in(666132615, 80);
         assert_eq!(filled_in.fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
-            z, X, X, X, X,
             X, X, z, X, X,
             X, X, X, X, X,
             z, X, X, X, z,
-            X, X, X, X, X
+            X, X, X, X, X,
+            X, X, X, X, z,
         ]);
 
         let data = GameData::new(
@@ -330,7 +336,7 @@ mod tests {
             X, X, z, z,
             X, 4, 1, z,
             X, z, z, z,
-            z, X, X, 1
+            z, z, X, 1
         ]);
 
         assert_eq!(data.fill_in(13371, 25).fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
@@ -341,4 +347,31 @@ mod tests {
         ]);
     }
   
+
+    #[test]
+    fn test_generate_at_start_bugfree() {
+        let X = BUG;
+        let o = UNOPENED;
+        let z = UNOPENED_BUGFREE;
+        let data = GameData::new(
+            4,4, vec![
+            o, o, o, o,
+            o, o, o, o,
+            o, o, z, o,
+            o, o, o, o,
+        ]);
+        assert_eq!(data.fill_in(13371, 50).fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            z, X, X, z,
+            X, z, z, z,
+            z, X, z, z,
+            z, X, X, X,
+        ]);
+        assert_eq!(data.fill_in(13371, 100).fields.iter().map(|field| field.data).collect::<Vec<u8>>(), vec![
+            X, X, X, X,
+            X, X, X, X,
+            X, X, z, X,
+            X, X, X, X,
+        ]);
+
+    }
 }

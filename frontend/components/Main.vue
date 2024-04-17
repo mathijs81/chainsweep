@@ -45,10 +45,13 @@ function newGame() {
                 </p>
             </div>
             <div class="col col-md-8 text-center mt-3">
-                <ClientOnly>
-                    <GameBoard v-if="currentBoard && gameState" :clickEnabled="gameState === GameState.PLAYING" :board="currentBoard"
-                        :state="gameState" @clickCell="click" />
-                </ClientOnly>
+                <template v-if="currentBoard && gameState">
+                    <ClientOnly>
+                        <GameBoard :clickEnabled="gameState === GameState.PLAYING" :board="currentBoard"
+                            :state="gameState" @clickCell="click" />
+                    </ClientOnly>
+                </template>
+                <img v-else class="my-3" src="../img/example.png" alt="Example game">
                 <div v-if="gameState === GameState.WON" class="alert alert-success game-result" role="alert">
                     You won!
                 </div>

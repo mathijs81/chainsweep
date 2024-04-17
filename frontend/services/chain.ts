@@ -67,6 +67,15 @@ class Web3Service extends EventTarget {
     //private watcher: WatchContractEventReturnType | null = null;
     private watcher: WatchEventReturnType | null = null;
 
+    private error: Ref<string | null> = ref(null);
+
+    setError(error: string | null) {
+        this.error.value = error;
+    }
+    getError() {
+        return readonly(this.error);
+    }
+
     private fireShouldConnect() {
         this.dispatchEvent(new Event('should-connect'));
     }
@@ -91,6 +100,10 @@ class Web3Service extends EventTarget {
         return readonly(this.currentGame);
     }
 
+    getAddress() {
+        return readonly(this.address);
+    }
+
     async onConnect(chainId: number) {
         this.client = null;
         this.address.value = null;
@@ -107,7 +120,13 @@ class Web3Service extends EventTarget {
                     account,
                 });
                 if (chainId !== targetChain.id) {
-                    this.client!!.switchChain(targetChain);
+                    console.log('initiating chain switch', chainId, targetChain.id);
+                    try {
+                        await this.client!!.switchChain(targetChain);
+                    } catch (e) {
+                        console.error('switch chain error', e);
+                        this.setError('Switching chain failed, please switch manually');
+                    }
                 } else {
                     if (this.watcher != null) {
                         this.watcher();
@@ -120,6 +139,7 @@ class Web3Service extends EventTarget {
                     //     onLogs: logs => console.log(logs),
                     //     pollingInterval: 1000
                     // })
+                    console.log('watching for events');
                     this.watcher = this.publicClient.watchEvent({
                         address: contractAddress,
                         onLogs: logs => {
@@ -127,6 +147,7 @@ class Web3Service extends EventTarget {
                             this.loadGameState();
                         }
                     })
+                    console.log('getting addresses');
                     const addresses = await this.client?.getAddresses();
                     this.address.value = addresses?.[0] ?? null;
                     console.log('got addresses', addresses);

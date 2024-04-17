@@ -10,10 +10,8 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@metamask/detect-provider": "^2.0.0",
     "@pinia/nuxt": "^0.5.1",
-    "@vue-dapp/core": "^1.1.0",
-    "@vue-dapp/modal": "^1.1.0",
-    "@vue-dapp/nuxt": "^1.1.0",
     "@vueuse/nuxt": "^10.9.0",
     "bootstrap": "^5.3.3",
     "nuxt": "^3.11.2",

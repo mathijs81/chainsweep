@@ -1,10 +1,8 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  // devtools: { enabled: true },
   modules: [
     '@vueuse/nuxt', '@nuxtjs/google-fonts',
-    '@vue-dapp/nuxt',
-    [ '@pinia/nuxt', { autoImports: ['defineStore', 'storeToRefs'] }]
   ],
   googleFonts: {
     families: { 

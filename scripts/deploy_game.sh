@@ -70,7 +70,7 @@ cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $contract_address "newGa
 
 cast call --rpc-url $RPC_URL $contract_address "viewFor(address)(string)" $ADDRESS | jq -r .
 
-cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $contract_address "makeGuess(uint8,uint8)" 5 3
+cast send --rpc-url $RPC_URL --private-key $PRIVATE_KEY $contract_address "makeGuess(uint8,uint8)" 4 2
 cast call --rpc-url $RPC_URL $contract_address "viewFor(address)(string)" $ADDRESS | jq -r .
 
 #echo "Current counter value: " $(cast call --rpc-url $RPC_URL $contract_address "number()")

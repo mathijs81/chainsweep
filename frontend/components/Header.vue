@@ -43,8 +43,12 @@ onMounted(() => {
     <div class="top-header py-1">
         <div class="container-md">
             <div class="row align-items-center">
-                <div class="col">
-                    <h1 class="fs-3 py-1 m-0">ChainSweep</h1>
+                <div class="col d-flex align-items-center">
+                    <img src="../img/chainsweep.png" alt="ChainSweep" class="logo-img">
+                    <div>
+                        <h1 class="fs-3 p-0 m-0">ChainSweep</h1>
+                        <small class="d-block" style="margin-top: -5px">An on-chain Arbitrum Stylus game</small>
+                    </div>
                 </div>
                 <VueDappProvider @connect="handleConnect" @disconnect="handleDisconnect">
                     <div class="col col-auto">
@@ -65,8 +69,9 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-.top-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
+.logo-img {
+    width: 3rem;
+    height: 3rem;
+    margin-right: 0.5rem;
 }
 </style>

@@ -8,8 +8,8 @@ export default defineNuxtConfig({
   ],
   googleFonts: {
     families: { 
-      'Nunito': [400, 700],
-      'Vast Shadow': 400,
+      'Fira Code': [400, 700],
+      'Sixtyfour': 400,
     }
   },
   css: ['~/styles/main.scss'],

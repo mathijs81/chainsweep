@@ -27,7 +27,7 @@ function formatCell(cell: String) {
         return '';
     }
     if (cell === ' ') {
-        return 'Validate';
+        return '?';
     }
     return cell;
 }
@@ -46,15 +46,17 @@ function click(x: number, y:number) {
 <template>
     <div class="board d-inline-block">
         <div v-for="(row, y) in props.board" :key="y" class="d-flex gridrow">
-            <div v-for="(cell, x) in row" :key="x" class="gridcell" :class="getClass(cell)" @click="click(x,y)">
-                {{ formatCell(cell) }}
+            <div v-for="(cell, x) in row" :key="x" class="gridcell" @click="click(x,y)">
+                <div :class="getClass(cell)">
+                    {{ formatCell(cell) }}
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <style lang="scss" scoped>
-$borderColor: #aaa;
+$borderColor: #ccc;
 $cellSize: 50px;
 .board {
     width: fit-content;
@@ -70,19 +72,25 @@ $cellSize: 50px;
     width: $cellSize;
     height: $cellSize;
     display: flex;
-    justify-content: center;
-    align-items: center;
+    align-items: stretch;
     font-weight: bold;
+
+    & div {
+      flex-grow: 1;
+      line-height: $cellSize;  
+    }
 }
 .unopened {
     background-color: #ddd;
     color: transparent;
     cursor: pointer;
+    transition: transform 0.1s ease;
     &.openable:hover {
         font-family: monospace;
         background-color: #eee;
-        color: #333;
+        color: #833;
         z-index: 3;
+        transform: scale(1.1);
     }
 }
 .bug {

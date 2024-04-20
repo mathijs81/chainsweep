@@ -1,9 +1,14 @@
 
-import { createPublicClient, createWalletClient, custom, http, type Address, type PublicClient, type WalletClient, type WatchEventReturnType } from 'viem';
+import { createPublicClient, createWalletClient, custom, http, parseAbi, type Address, type PublicClient, type WalletClient, type WatchContractEventReturnType } from 'viem';
 
 import { getContract } from 'viem';
 import { chainsweepAbi } from '../src/generated';
 import { contractAddress, targetChain } from './constants';
+
+// Copying the events here because `cargo stylus export-abi` doesn't export the event data   
+const eventAbi = parseAbi(['event GameStarted(address indexed player)',
+    `event FieldOpened(address indexed player, uint8 x, uint8 y, uint8 value)`,
+    `event GameOver(address indexed player, bool won)`]);
 
 export enum GameState {
     UNSTARTED,
@@ -24,6 +29,12 @@ export class Game {
     }
 }
 
+export interface RecentGame {
+    game: Game;
+    lastChange: number;
+    player: Address;
+}
+
 class Web3Service extends EventTarget {
     private publicClient: PublicClient = createPublicClient({
         chain: targetChain,
@@ -32,10 +43,71 @@ class Web3Service extends EventTarget {
     private client: WalletClient | null = null;
     private address: Ref<Address | null> = ref(null);
     private currentGame: Ref<Game | null> = ref(null);
+    private recentGames: Ref<RecentGame[]> = ref([]);
+
     //private watcher: WatchContractEventReturnType | null = null;
-    private watcher: WatchEventReturnType | null = null;
+    private watcher: WatchContractEventReturnType | null = null;
 
     private error: Ref<string | null> = ref(null);
+
+    constructor() {
+        super();
+        if (this.watcher != null) {
+            this.watcher();
+        }
+
+        this.publicClient.getBlockNumber().then(async blockNumber => {
+            try {
+                const logs = await this.publicClient.getContractEvents({
+                    address: contractAddress,
+                    abi: eventAbi,
+                    fromBlock: blockNumber > 100_000n ? blockNumber - 100_000n : 1n
+                });
+                const lastAction = new Map<Address, number>();
+                for (const log of logs) {
+                    if (log.eventName === 'FieldOpened') {
+                        lastAction.set(log.args['player']!!, Number(log.blockNumber));
+                    }
+                }
+
+                // Select the 5 most recently active addresses
+                const sorted = Array.from(lastAction.entries()).sort((a, b) => b[1] - a[1]);
+                const recent = sorted.slice(0, 5);
+                const recentGames = await Promise.all(recent.map(async ([player, blockNumber]) => {
+                    const result = await this.publicContract().read?.viewFor([player]);
+                    if (result != null) {
+                        return { game: this.parseGameState(result), lastChange: blockNumber, player };
+                    } else {
+                        console.log("got null for", player);
+                    }
+                    return null;
+                }));
+                this.recentGames.value = recentGames.filter(g => g != null) as RecentGame[];
+                console.log(this.recentGames.value.length + ' recent games loaded');
+            } catch (e) {
+                console.error('error getting historic events', e);
+            }
+            this.publicClient.watchContractEvent({
+                address: contractAddress,
+                abi: eventAbi,
+                onLogs: logs => {
+                    logs.forEach(async log => {
+                        let player = (log.args as { player: Address})['player'];
+                        if (this.address.value === player) {
+                            this.loadGameState();
+                        }
+
+                        const blockNumber = Number(log.blockNumber);
+                        const gameBoard = await this.publicContract().read?.viewFor([player]);
+                        const recentGame = { game: this.parseGameState(gameBoard), lastChange: blockNumber, player };
+                        this.recentGames.value = [recentGame, ...this.recentGames.value.filter(g => g.player !== player)].slice(0, 5);
+                    })
+                },
+                pollingInterval: 1000
+            })
+        });
+    }
+
 
     setError(error: string | null) {
         this.error.value = error;
@@ -44,8 +116,21 @@ class Web3Service extends EventTarget {
         return readonly(this.error);
     }
 
+    getRecentGames() {
+        return readonly(this.recentGames);
+    }
+
     private fireShouldConnect() {
         this.dispatchEvent(new Event('should-connect'));
+    }
+
+
+    private publicContract() {
+        return getContract({
+            address: contractAddress,
+            abi: chainsweepAbi,
+            client: this.publicClient,
+        });
     }
 
     private contract() {
@@ -97,7 +182,7 @@ class Web3Service extends EventTarget {
                     try {
                         try {
                             await this.client!!.addChain({ chain: targetChain });
-                        } catch(e) {
+                        } catch (e) {
                             // Ignore error if chain already exists
                         }
                         await this.client!!.switchChain(targetChain);
@@ -106,27 +191,8 @@ class Web3Service extends EventTarget {
                         this.setError('Switching chain failed, please switch manually');
                     }
                 } else {
-                    if (this.watcher != null) {
-                        this.watcher();
-                    }
-                    // TODO: fix watching for proper contract events, currently not possible
-                    // because `cargo stylus export-abi` doesn't export the event data
-                    // this.watcher = this.publicClient.watchContractEvent({
-                    //     address: contractAddress,
-                    //     abi: chainsweepAbi,
-                    //     onLogs: logs => console.log(logs),
-                    //     pollingInterval: 1000
-                    // })
-                    console.log('watching for events');
-                    this.watcher = this.publicClient.watchEvent({
-                        address: contractAddress,
-                        onLogs: logs => {
-                            console.log('Event from contract, updating game state');
-                            this.loadGameState();
-                        }
-                    })
                     this.setError(null);
-                   
+
                     if (this.address.value) {
                         await this.loadGameState();
                     }
@@ -143,11 +209,7 @@ class Web3Service extends EventTarget {
         }
     }
 
-    private onGameUpdate(result: string) {
-        if (result.includes('not started')) {
-            this.currentGame.value = null;
-            return;
-        }
+    private parseGameState(result: string): Game {
         const lines = result.trimEnd().split('\n');
         const game = new Game();
         game.state = GameState.PLAYING;
@@ -160,21 +222,30 @@ class Web3Service extends EventTarget {
         for (let i = 0; i < lines.length - 1; i++) {
             game.field.push(lines[i]);
         }
-        this.currentGame.value = game;
+        return game;
+    }
+
+    private onGameUpdate(result: string) {
+        if (result.includes('not started')) {
+            this.currentGame.value = null;
+            return;
+        }    
+        this.currentGame.value = this.parseGameState(result);
     }
 
     async clickCell(x: number, y: number) {
         try {
-            const gasEstimate = await this.contract()?.estimateGas.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain });
+            const gasEstimate = await this.contract()?.estimateGas.makeGuess([x, y], { account: this.client!!.account!! });
             if (gasEstimate === undefined) {
                 throw new Error('Gas estimation failed');
             }
-            const tx = await this.contract()?.write.makeGuess([x, y], { account: this.client!!.account!!, chain: targetChain,
+            const tx = await this.contract()?.write.makeGuess([x, y], {
+                account: this.client!!.account!!, chain: targetChain,
                 gas: gasEstimate * 2n + 100_000n
             });
-        } catch(e) {
+        } catch (e) {
             console.error('makeGuess error', e);
-            this.setError('Error: ' + e.message);
+            this.setError('Error: ' + (e as any).message);
             setTimeout(() => this.setError(null), 5000);
         }
     }

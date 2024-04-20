@@ -21,6 +21,10 @@ function click(data: { x: number, y: number }) {
 function newGame() {
     web3Service.newGame();
 }
+
+const recentGames = web3Service.getRecentGames();
+const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+const address = web3Service.getAddress();
 </script>
 
 <template>
@@ -48,7 +52,7 @@ function newGame() {
                 <template v-if="currentBoard && gameState">
                     <ClientOnly>
                         <GameBoard :clickEnabled="gameState === GameState.PLAYING" :board="currentBoard"
-                            :state="gameState" @clickCell="click" />
+                            :state="gameState" @clickCell="click" class="m-3" />
                     </ClientOnly>
                 </template>
                 <img v-else class="my-3" src="../img/example.png" alt="Example game">
@@ -64,6 +68,25 @@ function newGame() {
             </div>
 
         </div>
+        <div class="row">
+            <div class="col">
+                <h2 class="fs-4 mt-3 mb-1">Recent games</h2>
+                <div class="d-flex gap-2">
+                    <div v-for="(game, index) in recentGames" :key="index" class="text-center">
+                        <div>{{ formatAddress(game.player) }}<span class="badge text-bg-success ms-2" v-if="game.player == address">YOU</span></div>
+                        <div>@ block {{ game.lastChange }}</div>
+                        <div>
+                            <div v-if="game.game.state === GameState.WON" class="text-success" role="alert">
+                                Won</div>
+                            <div v-else-if="game.game.state === GameState.LOST" class="text-danger" role="alert">
+                                Lost</div>
+                                <div v-else>In progress</div>
+                        </div>
+                        <GameBoard :clickEnabled="false" :board="game.game.field.map(row => [...row])" :state="game.game.state" class="m-0" />
+                    </div>  
+                </div>
+            </div>
+        </div>  
     </div>
 </template>
 

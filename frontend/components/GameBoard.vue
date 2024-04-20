@@ -48,7 +48,7 @@ function click(x: number, y:number) {
 </script>
 
 <template>
-    <div class="board d-inline-block m-3">
+    <div class="board d-inline-block">
         <div v-for="(row, y) in props.board" :key="y" class="d-flex gridrow">
             <div v-for="(cell, x) in row" :key="x" class="gridcell" @click="click(x,y)">
                 <div :class="getClass(cell)">

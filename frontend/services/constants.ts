@@ -2,7 +2,7 @@ import { defineChain } from "viem";
 
 const isLocalDev = process.env.NODE_ENV === 'development';
 
-const localContractAddress = '0x906B067e392e2c5f9E4f101f36C0b8CdA4885EBf';
+const localContractAddress = '0xF85895D097B2C25946BB95C4d11E2F3c035F8f0C';
 const localTargetChain = defineChain({
     id: 412346,
     name: "Stylus Local",
@@ -28,7 +28,7 @@ const localTargetChain = defineChain({
     },
 });
 
-const stylusAddress = '0xE015beC2035588e2bCE7CFbA405dAB285b6dD3C7';
+const stylusAddress = '0xF19b33779c050294c539b7617ECf6CD1744c4236';
 const stylusTestnet = defineChain({
     id: 23011913,
     name: 'Stylus Testnet',

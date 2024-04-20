@@ -70,9 +70,9 @@ class Web3Service extends EventTarget {
                     }
                 }
 
-                // Select the 5 most recently active addresses
+                // Select the most recently active addresses
                 const sorted = Array.from(lastAction.entries()).sort((a, b) => b[1] - a[1]);
-                const recent = sorted.slice(0, 5);
+                const recent = sorted.slice(0, 10);
                 const recentGames = await Promise.all(recent.map(async ([player, blockNumber]) => {
                     const result = await this.publicContract().read?.viewFor([player]);
                     if (result != null) {
@@ -248,6 +248,20 @@ class Web3Service extends EventTarget {
             this.setError('Error: ' + (e as any).message);
             setTimeout(() => this.setError(null), 5000);
         }
+    }
+
+    async simulate() {
+        let result = [];
+        for (let i = 0; i < 5; i++) {
+            // bigint random u64:
+            const seed = BigInt(Math.floor(Math.random() * 2**64));
+            const game = await this.contract()?.read?.viewCompleted([this.address.value!!, seed]);
+            if (!game) {
+                continue;
+            }
+            result.push(this.parseGameState(game));
+        }
+        return result;
     }
 
     newGame() {

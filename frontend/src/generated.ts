@@ -25,6 +25,16 @@ export const chainsweepAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: '_address', internalType: 'address', type: 'address' },
+      { name: 'seed', internalType: 'uint64', type: 'uint64' },
+    ],
+    name: 'viewCompleted',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: '_address', internalType: 'address', type: 'address' }],
     name: 'viewFor',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],

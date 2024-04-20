@@ -1,7 +1,5 @@
 {
     "rust-analyzer.linkedProjects": [
-        "./counter/Cargo.toml",
-        "./nft/Cargo.toml",
         "./chainsweep/Cargo.toml"
     ]
 }

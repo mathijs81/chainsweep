@@ -111,18 +111,14 @@ impl Game {
         }
     }
 
-    pub fn print(&self) -> String {
-        if self.state.get().byte(0) == STATE_NOT_STARTED {
-            return "Game not started".to_string();
-        }
-        let field_data = self.get_field();
+    fn print_field(field_data: GameData, state: u8) -> String {
         let mut res = String::new();
         for j in 0..HEIGHT {
             for i in 0..WIDTH {
                 let fieldval = field_data.get(i, j).data;
                 if fieldval == BUG {
                     res.push_str("X");
-                } else if fieldval == UNOPENED {
+                } else if fieldval == UNOPENED || fieldval == UNOPENED_BUGFREE{
                     res.push_str(" ");
                 } else {
                     res.push_str(&fieldval.to_string());
@@ -130,13 +126,26 @@ impl Game {
             }
             res.push_str("\n");
         }
-        match self.state.get().byte(0) {
+        match state {
             STATE_PLAYING => res.push_str("Playing\n"),
             STATE_LOST => res.push_str("Lost\n"),
             STATE_WON => res.push_str("Won\n"),
             _ => res.push_str("Unknown state"),
         }
         res
+    }
+    
+    pub fn print(&self) -> String {
+        if self.state.get().byte(0) == STATE_NOT_STARTED {
+            return "Game not started".to_string();
+        }
+        let field_data = self.get_field();
+        Self::print_field(field_data, self.state.get().byte(0))
+    }
+
+    pub fn print_filled_in(&self, rand_seed: u64) -> String {
+        let filled_in =  self.get_field().fill_in(rand_seed, BUG_CHANCE_100);
+        Self::print_field(filled_in, self.state.get().byte(0))
     }
 
     pub fn make_guess(&mut self, x: u8, y: u8, rand_seed: u64) -> Result<u8, GameError> {

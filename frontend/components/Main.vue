@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { web3Service, GameState, Game } from '~/services/chain';
+import { web3Service, GameState, type Game } from '~/services/chain';
 import { useIntervalFn } from '@vueuse/core';
 import { rand } from '@vueuse/shared';
 
@@ -29,9 +29,11 @@ const address = web3Service.getAddress();
 
 const simulatedGames = ref([] as Game[]);
 const simulatedGame = ref(null as Game | null);
+let simulatedGameSource = null as string[] | null;
 
 async function simulate() {
     simulatedGames.value = await web3Service.simulate();
+    simulatedGameSource = [...web3Service.getCurrentGame().value!!.field];
 }
 
 watchEffect(cleanup => {
@@ -43,6 +45,13 @@ watchEffect(cleanup => {
         cleanup(() => {
             handler.pause();
         });
+    }
+});
+
+watchEffect(() => {
+    if (web3Service.getCurrentGame().value?.field !== simulatedGameSource) {
+        simulatedGames.value = [];
+        simulatedGame.value = null;
     }
 });
 </script>

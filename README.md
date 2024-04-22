@@ -1,8 +1,19 @@
-# ChainSweep game
+# ChainSweep on-chain game
 
-This is an arbitrum Stylus-based blockchain game called ChainSweep.
+![Screenshot](/screenshot.png?raw=true)
 
-In a field of blocks, find the faulty ones (not unlike the good ol' minesweeper).
+*[Live demo on Arbitrum Stylus Testnet](https://chainsweep.vercel.app/)*
+
+This game is an on-chain implementation of a game similar to the well-known "minesweeper" game.
+
+In a field of blocks you have to validate blocks, avoiding the ones that contain bugs. When you click a buggy block, you lose. When you validated all blocks without bugs, you win.
+
+The game is run fully on-chain (Arbitrum Stylus Testnet). Every move you make is a separate transaction.
+
+The important piece of information in the game is where exactly the bugs are (the fields you shouldn't click). If the smart contract chooses these spots and stores them on chain, then it would be trivial to win the game by looking with a block explorer or other tools where the bugs are.
+To avoid this, the contract only stores which fields have been revealed so far. When the player makes a new move, the smart contract re-generates a potential assignment of bugs on the field that's consistent with the moves made so far. This makes that the game remains unpredictable.
+
+To make the calculation of possible assignments efficient, it uses Arbitrum Stylus so that Rust code can be run as WebAssembly and the simulation process doesn't take too much gas.
 
 This is a submission for [Scaling Ethereum 2024](https://ethglobal.com/events/scaling2024).
 
